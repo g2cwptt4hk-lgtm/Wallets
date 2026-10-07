@@ -1,0 +1,2019 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#000000" />
+  <title>Wallet</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <style>
+    :root {
+      --bg: #000000;
+      --text: #ffffff;
+      --muted: #8e8e93;
+      --muted2: #636366;
+      --accent: #0a84ff;
+      --danger: #ff453a;
+      --success: #30d158;
+      --surface: #1c1c1e;
+      --surface-2: #2c2c2e;
+      --surface-3: #3a3a3c;
+      --separator: rgba(84,84,88,0.55);
+      --card-radius: 16px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none; }
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Helvetica, Arial, sans-serif;
+      overflow: hidden;
+      overscroll-behavior: none;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .status-bar { height: env(safe-area-inset-top, 47px); }
+    .app { height: 100%; display: flex; flex-direction: column; }
+
+    /* ===== HEADER ===== */
+    .header {
+      padding: 4px 16px 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    .header h1 {
+      font-size: 34px;
+      font-weight: 700;
+      letter-spacing: -0.8px;
+      line-height: 1.1;
+    }
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .circle-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: #2c2c2e;
+      border: none;
+      color: #ffffff;
+      font-size: 24px;
+      font-weight: 300;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      line-height: 1;
+      padding-bottom: 2px;
+    }
+    .pill-btn {
+      height: 36px;
+      padding: 0 12px 0 14px;
+      border-radius: 18px;
+      background: #2c2c2e;
+      border: none;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      font-size: 15px;
+    }
+    .pill-btn .dots {
+      font-size: 16px;
+      letter-spacing: 0.5px;
+      opacity: 0.95;
+    }
+
+    /* ===== VIEWS ===== */
+    .view {
+      display: none;
+      flex: 1;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      padding-bottom: calc(50px + env(safe-area-inset-bottom, 0px));
+    }
+    .view.active { display: block; }
+
+    /* ===== CARD STACK ===== */
+    .card-stack {
+      padding: 6px 16px 40px;
+      position: relative;
+    }
+    .wallet-card {
+      /* Apple Wallet card ratio ≈ 1.586:1 (standard CR80 credit card) */
+      width: 100%;
+      aspect-ratio: 1.586 / 1;
+      height: auto;
+      border-radius: var(--card-radius);
+      overflow: hidden;
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      color: white;
+      position: relative;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.55);
+      margin-bottom: -40%; /* match the wider card spacing in the reference */
+      transition: transform 0.18s ease, box-shadow 0.18s ease;
+      cursor: grab;
+      touch-action: none;
+    }
+    .wallet-card:last-child { margin-bottom: 0; }
+    .wallet-card:active { cursor: grabbing; }
+    .wallet-card.dragging {
+      opacity: 0.92;
+      transform: scale(1.03);
+      box-shadow: 0 16px 40px rgba(0,0,0,0.6);
+      z-index: 100;
+    }
+
+    .wallet-card .card-inner {
+      height: 100%;
+      padding: 18px 20px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .card-top-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+    .card-name {
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: -0.2px;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.8), 0 0 8px rgba(0,0,0,0.5);
+      max-width: 70%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .card-badge {
+      font-size: 12px;
+      font-weight: 500;
+      opacity: 0.9;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.8), 0 0 6px rgba(0,0,0,0.4);
+    }
+    .card-bottom-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+    }
+    .card-last4 {
+      font-size: 17px;
+      font-weight: 500;
+      letter-spacing: 1.8px;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.9), 0 0 10px rgba(0,0,0,0.5);
+      color: #ffffff;
+    }
+
+    .bg-blue { background: linear-gradient(145deg, #1a5fb4, #0c3d8a); }
+    .bg-black { background: linear-gradient(145deg, #2c2c2e, #111); }
+    .bg-gold { background: linear-gradient(145deg, #d4a017, #8a6d0b); color: #1a1a1a; }
+    .bg-silver { background: linear-gradient(145deg, #c0c0c0, #7a7a7a); color: #111; }
+    .bg-purple { background: linear-gradient(145deg, #7c3aed, #4c1d95); }
+    .bg-green { background: linear-gradient(145deg, #0d9488, #065f46); }
+    .bg-red { background: linear-gradient(145deg, #dc2626, #7f1d1d); }
+    .bg-indigo { background: linear-gradient(145deg, #4f46e5, #312e81); }
+
+    .empty-cards {
+      text-align: center;
+      padding: 80px 20px;
+      color: var(--muted);
+      font-size: 16px;
+    }
+
+    /* ===== DETAIL VIEW ===== */
+    .detail-top { padding: 0 16px 8px; }
+    .back-circle {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: #2c2c2e;
+      border: none;
+      color: #ffffff;
+      font-size: 22px;
+      font-weight: 300;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      margin-bottom: 14px;
+      line-height: 1;
+    }
+    .detail-card {
+      width: 100%;
+      aspect-ratio: 1.586 / 1;
+      height: auto;
+      border-radius: var(--card-radius);
+      overflow: hidden;
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      margin-bottom: 16px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+      position: relative;
+    }
+    .detail-card .card-inner {
+      height: 100%;
+      padding: 18px 20px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      color: white;
+    }
+
+    .stats-row {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 6px;
+    }
+    .stat-card {
+      flex: 1;
+      border: 0;
+      color: inherit;
+      text-align: left;
+      font-family: inherit;
+      cursor: pointer;
+      background: #1c1c1e;
+      border-radius: 14px;
+      padding: 14px 16px;
+    }
+    .stat-label {
+      font-size: 13px;
+      color: #8e8e93;
+      margin-bottom: 3px;
+      font-weight: 400;
+    }
+    .stat-value {
+      font-size: 22px;
+      font-weight: 600;
+      letter-spacing: -0.5px;
+    }
+    .activity-bars {
+      display: flex;
+      align-items: flex-end;
+      gap: 3.5px;
+      height: 34px;
+      margin-top: 6px;
+    }
+    .activity-bars span {
+      flex: 1;
+      background: #3a3a3c;
+      border-radius: 2.5px;
+      min-height: 5px;
+    }
+    .activity-bars span.active {
+      background: #64d2ff;
+    }
+
+    .updated {
+      font-size: 13px;
+      color: #8e8e93;
+      margin: 2px 0 18px 2px;
+      font-weight: 400;
+    }
+
+    .section-title {
+      font-size: 20px;
+      font-weight: 600;
+      letter-spacing: -0.3px;
+      margin-bottom: 10px;
+      padding-left: 1px;
+    }
+
+    .tx-list {
+      background: #1c1c1e;
+      border-radius: 14px;
+      overflow: hidden;
+    }
+    .tx-item {
+      display: flex;
+      align-items: center;
+      padding: 14px 16px;
+      border-bottom: 0.5px solid var(--separator);
+      cursor: pointer;
+      gap: 0;
+    }
+    .tx-item:last-child { border-bottom: none; }
+    .tx-info { flex: 1; min-width: 0; padding-right: 12px; }
+    .tx-merchant {
+      font-size: 16px;
+      font-weight: 400;
+      letter-spacing: -0.2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: #ffffff;
+    }
+    .tx-sub {
+      font-size: 13px;
+      color: #8e8e93;
+      margin-top: 2px;
+      font-weight: 400;
+    }
+    .tx-right {
+      text-align: right;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: 2px;
+    }
+    .tx-amount {
+      font-size: 16px;
+      font-weight: 400;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.2px;
+      color: #ffffff;
+    }
+    .tx-amount.credit { color: #30d158; }
+    .tx-chevron {
+      color: #636366;
+      font-size: 20px;
+      font-weight: 300;
+      margin-left: 2px;
+      line-height: 1;
+    }
+
+    /* Floating search button */
+    .fab-search {
+      position: fixed;
+      right: 20px;
+      bottom: calc(28px + env(safe-area-inset-bottom, 0px));
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      background: #2c2c2e;
+      border: none;
+      color: #ffffff;
+      font-size: 20px;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+      cursor: pointer;
+      z-index: 50;
+    }
+    /* visibility is controlled by JavaScript so it follows the current screen */
+
+    /* ===== WALLET SEARCH ===== */
+    .search-view { padding: 0 0 110px; }
+    .search-page { padding: 8px 0 0; }
+    .search-page-title { font-size: 34px; font-weight: 700; letter-spacing: -0.8px; padding: 0 20px 24px; }
+    .search-suggestions { padding: 0 20px; }
+    .search-suggestion { display:flex; align-items:center; gap:18px; min-height:66px; border-bottom:1px solid rgba(84,84,88,.32); font-size:22px; cursor:pointer; }
+    .search-suggestion:last-child { border-bottom:0; }
+    .search-icon-large { width:36px; height:36px; flex:0 0 36px; }
+    .search-icon-large svg { width:36px; height:36px; }
+    .search-section-title { font-size:28px; font-weight:700; letter-spacing:-.4px; padding:34px 20px 18px; display:flex; justify-content:space-between; align-items:center; }
+    .search-see-all { color:var(--accent); font-size:21px; font-weight:400; cursor:pointer; }
+    .search-results-card { margin:0 20px; background:var(--surface); border-radius:28px; overflow:hidden; }
+    .search-result-row { display:flex; align-items:center; gap:16px; padding:18px 18px; border-bottom:1px solid rgba(84,84,88,.55); min-height:104px; cursor:pointer; }
+    .search-result-row:last-child { border-bottom:0; }
+    .search-result-icon { width:56px; height:56px; border-radius:14px; flex:0 0 56px; display:flex; align-items:center; justify-content:center; overflow:hidden; background:#fff; color:#111; font-weight:700; font-size:22px; }
+    .search-result-icon img { width:100%; height:100%; object-fit:cover; }
+    .search-result-main { flex:1; min-width:0; }
+    .search-result-title { font-size:21px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .search-result-sub { margin-top:5px; color:var(--muted); font-size:17px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .search-result-amount { font-size:19px; flex:0 0 auto; text-align:right; }
+    .search-result-amount.credit { color:var(--success); }
+    .search-chevron { color:var(--muted2); font-size:32px; line-height:1; }
+    .search-horizontal { display:flex; gap:18px; overflow-x:auto; padding:0 20px 8px; scrollbar-width:none; }
+    .search-horizontal::-webkit-scrollbar { display:none; }
+    .search-tile { flex:0 0 124px; text-align:center; cursor:pointer; }
+    .search-tile-icon { width:124px; height:124px; border-radius:22px; display:flex; align-items:center; justify-content:center; font-size:48px; margin-bottom:9px; }
+    .search-tile-label { font-size:17px; line-height:1.2; }
+    .search-empty { color:var(--muted); padding:26px 20px; font-size:18px; text-align:center; }
+    .search-dock { position:fixed; left:18px; right:18px; bottom:calc(18px + env(safe-area-inset-bottom,0px)); display:none; align-items:center; gap:10px; z-index:80; }
+    .search-dock.open { display:flex; }
+    .search-input-wrap { height:58px; flex:1; border-radius:30px; background:rgba(44,44,46,.96); border:1px solid rgba(255,255,255,.12); display:flex; align-items:center; gap:12px; padding:0 16px; box-shadow:0 8px 28px rgba(0,0,0,.4); }
+    .search-input-wrap input { flex:1; min-width:0; border:0; outline:0; background:transparent; color:#fff; font:inherit; font-size:20px; user-select:text; -webkit-user-select:text; }
+    .search-input-wrap input::placeholder { color:#8e8e93; }
+    .search-clear { width:28px; height:28px; border-radius:50%; border:0; background:#f2f2f7; color:#333; display:none; align-items:center; justify-content:center; font-size:20px; cursor:pointer; }
+    .search-close { width:58px; height:58px; border-radius:50%; border:1px solid rgba(255,255,255,.12); background:#2c2c2e; color:#fff; display:flex; align-items:center; justify-content:center; font-size:36px; font-weight:200; cursor:pointer; box-shadow:0 8px 28px rgba(0,0,0,.4); }
+    .search-view input { -webkit-user-select:text; user-select:text; }
+
+
+    /* ===== TRANSACTION DETAIL ===== */
+    .tx-detail {
+      padding: 0 20px;
+      text-align: center;
+    }
+    .tx-detail-amount {
+      font-size: 48px;
+      font-weight: 600;
+      letter-spacing: -1.8px;
+      margin: 12px 0 8px;
+      line-height: 1.05;
+    }
+    .tx-detail-merchant {
+      font-size: 17px;
+      color: #8e8e93;
+      margin-bottom: 3px;
+      font-weight: 400;
+    }
+    .tx-detail-date {
+      font-size: 15px;
+      color: #8e8e93;
+      margin-bottom: 28px;
+      font-weight: 400;
+    }
+    .info-card {
+      background: #1c1c1e;
+      border-radius: 14px;
+      padding: 16px 18px;
+      text-align: left;
+      margin-bottom: 14px;
+    }
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 5px 0;
+    }
+    .info-label { color: #8e8e93; font-size: 15px; font-weight: 400; }
+    .info-value { font-size: 15px; font-weight: 500; color: #ffffff; }
+    .info-divider {
+      height: 0.5px;
+      background: var(--separator);
+      margin: 12px 0;
+    }
+    .status-block {
+      padding: 2px 0 4px;
+    }
+    .status-main {
+      font-size: 16px;
+      font-weight: 500;
+      color: #ffffff;
+      margin-bottom: 3px;
+    }
+    .status-card-name {
+      font-size: 15px;
+      font-weight: 400;
+      color: #8e8e93;
+    }
+    .action-btn {
+      display: block;
+      width: 100%;
+      background: #1c1c1e;
+      border: none;
+      color: #0a84ff;
+      padding: 15px;
+      border-radius: 14px;
+      font-size: 16px;
+      font-weight: 400;
+      text-align: center;
+      margin-bottom: 12px;
+      cursor: pointer;
+    }
+    .help-text {
+      font-size: 13px;
+      color: #8e8e93;
+      text-align: left;
+      line-height: 1.45;
+      margin: 10px 4px 24px;
+      font-weight: 400;
+    }
+
+    /* ===== SPENDING ACTIVITY ===== */
+    .activity-nav {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      min-height: 92px;
+      padding: 10px 34px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(10,10,10,0.72);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+    }
+    .activity-back {
+      position: absolute;
+      left: 34px;
+      top: 10px;
+      width: 58px;
+      height: 58px;
+      border-radius: 50%;
+      background: #2c2c2e;
+      border: 1px solid rgba(255,255,255,0.10);
+      color: #fff;
+      font-size: 45px;
+      line-height: 50px;
+      font-weight: 200;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      padding: 0 0 6px;
+    }
+    .period-switch {
+      width: min(390px, calc(100% - 110px));
+      min-width: 300px;
+      height: 60px;
+      padding: 5px;
+      border-radius: 32px;
+      background: #242426;
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04);
+      display: flex;
+    }
+    .period-btn {
+      flex: 1;
+      border: 0;
+      background: transparent;
+      color: #fff;
+      border-radius: 28px;
+      font-size: 17px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    .period-btn.selected { background: #0b0b0c; }
+    .activity-content {
+      padding: 22px 40px 60px;
+    }
+    .activity-date {
+      font-size: 40px;
+      line-height: 1.05;
+      font-weight: 700;
+      letter-spacing: -1.4px;
+      margin: 4px 0 30px;
+    }
+    .activity-section { margin-bottom: 42px; }
+    .activity-section-title-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      margin: 0 0 22px;
+    }
+    .activity-section-title {
+      font-size: 29px;
+      font-weight: 700;
+      letter-spacing: -0.8px;
+    }
+    .activity-link {
+      color: #0a84ff;
+      font-size: 18px;
+      background: transparent;
+      border: 0;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .activity-card {
+      background: #1c1c1e;
+      border-radius: 26px;
+      padding: 30px 28px 24px;
+      overflow: hidden;
+    }
+    .activity-kicker { color: #8e8e93; font-size: 18px; margin-bottom: 18px; }
+    .activity-total {
+      font-size: 42px;
+      font-weight: 600;
+      letter-spacing: -1.5px;
+      margin-bottom: 14px;
+    }
+    .activity-summary { font-size: 21px; line-height: 1.55; margin-bottom: 24px; }
+    .activity-summary strong { font-weight: 600; }
+    .activity-chart {
+      position: relative;
+      height: 340px;
+      padding: 28px 54px 54px 0;
+      border-top: 1px solid rgba(84,84,88,0.55);
+      border-bottom: 1px solid rgba(84,84,88,0.55);
+    }
+    .chart-grid { position: absolute; inset: 28px 54px 54px 0; display:flex; flex-direction:column; justify-content:space-between; pointer-events:none; }
+    .chart-grid-line { border-top: 1px solid rgba(84,84,88,0.32); position: relative; }
+    .chart-grid-line span { position:absolute; right:-48px; top:-12px; color:#8e8e93; font-size:14px; }
+    .chart-bars { position:absolute; left:0; right:54px; top:28px; bottom:54px; display:flex; align-items:flex-end; justify-content:space-around; gap:10px; }
+    .chart-col { flex:1; height:100%; display:flex; align-items:flex-end; justify-content:center; min-width:0; }
+    .chart-bar { width: min(48px, 72%); min-height: 2px; border-radius: 9px 9px 0 0; background: linear-gradient(to top, #ff5b61 0%, #ff5b61 44%, #ff9d00 63%, #7a5cff 82%, #3d7eff 100%); }
+    .chart-labels { position:absolute; left:0; right:54px; bottom:0; display:flex; justify-content:space-around; gap:10px; }
+    .chart-labels span { flex:1; text-align:center; color:#8e8e93; font-size:16px; }
+    .activity-empty { color:#8e8e93; font-size:18px; padding:20px 0; }
+    .segmented {
+      display:flex; background:#1c1c1e; border-radius:32px; padding:3px; margin-bottom:22px;
+    }
+    .segmented button { flex:1; border:0; background:transparent; color:#fff; padding:10px 12px; border-radius:28px; font-size:16px; cursor:pointer; }
+    .segmented button.selected { background:#66666b; }
+    .activity-list-card { background:#1c1c1e; border-radius:26px; overflow:hidden; }
+    .activity-row { display:flex; align-items:center; gap:16px; padding:20px 30px; border-bottom:1px solid rgba(84,84,88,0.55); min-height:104px; }
+    .activity-row:last-child { border-bottom:0; }
+    .activity-row-no-icon { padding-left:30px; }
+    .activity-icon { width:52px; height:52px; border-radius:14px; display:flex; align-items:center; justify-content:center; flex:0 0 52px; color:#fff; }
+    .activity-icon svg { width:31px; height:31px; }
+    .icon-blue { background:#2f8ff5; }
+    .icon-orange { background:#ff9d45; }
+    .icon-red { background:#ff5c62; }
+    .icon-dark { background:#202023; border:1px solid #66666b; }
+    .activity-row-main { flex:1; min-width:0; }
+    .activity-row-title { font-size:20px; font-weight:600; margin-bottom:5px; }
+    .activity-row-sub { color:#8e8e93; font-size:17px; }
+    .activity-row-right { text-align:right; flex:0 0 auto; }
+    .activity-row-amount { font-size:20px; }
+    .activity-row-meta { color:#8e8e93; font-size:17px; margin-top:9px; }
+    .activity-chevron { color:#636366; font-size:34px; line-height:1; margin-left:4px; }
+    .activity-note { color:#8e8e93; font-size:16px; line-height:1.5; padding:22px 28px 0; }
+    @media (max-width: 520px) {
+      .activity-nav { padding-left:22px; padding-right:22px; }
+      .activity-back { left:22px; }
+      .period-switch { min-width:0; width:calc(100% - 72px); height:56px; }
+      .period-btn { font-size:16px; }
+      .activity-content { padding:18px 40px 52px; }
+      .activity-date { font-size:38px; }
+      .activity-section-title { font-size:27px; }
+      .activity-card { padding:26px 24px 22px; }
+      .activity-total { font-size:40px; }
+      .activity-summary { font-size:20px; }
+      .activity-chart { height:320px; }
+      .activity-row { padding:19px 26px; }
+    }
+
+    /* ===== ACTION SHEET ===== */
+    .sheet-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 300;
+      display: none;
+      align-items: flex-end;
+      justify-content: center;
+    }
+    .sheet-overlay.open { display: flex; }
+    .sheet {
+      background: #1c1c1e;
+      width: 100%;
+      max-width: 500px;
+      border-radius: 14px 14px 0 0;
+      padding: 10px 12px 34px;
+      animation: slideUp 0.28s cubic-bezier(0.32,0.72,0,1);
+    }
+    @keyframes slideUp {
+      from { transform: translateY(100%); }
+      to { transform: translateY(0); }
+    }
+    .sheet-handle {
+      width: 36px;
+      height: 5px;
+      background: #3a3a3c;
+      border-radius: 3px;
+      margin: 4px auto 14px;
+    }
+    .sheet-title {
+      font-size: 13px;
+      color: #8e8e93;
+      text-align: center;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      font-weight: 500;
+    }
+    .sheet-item {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 15px 12px;
+      border-radius: 12px;
+      cursor: pointer;
+      font-size: 17px;
+      font-weight: 400;
+      color: #ffffff;
+    }
+    .sheet-item:active { background: #2c2c2e; }
+    .sheet-item .icon {
+      width: 26px;
+      text-align: center;
+      font-size: 18px;
+      opacity: 0.95;
+    }
+    .sheet-cancel {
+      margin-top: 8px;
+      text-align: center;
+      padding: 15px;
+      color: #0a84ff;
+      font-size: 17px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+
+    /* ===== EDITOR ===== */
+    .editor-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.55);
+      z-index: 400;
+      display: none;
+      align-items: flex-end;
+      justify-content: center;
+    }
+    .editor-overlay.open { display: flex; }
+    .editor-panel {
+      background: #1c1c1e;
+      width: 100%;
+      max-width: 500px;
+      max-height: 92vh;
+      border-radius: 14px 14px 0 0;
+      overflow-y: auto;
+      padding: 16px 18px 40px;
+      animation: slideUp 0.28s cubic-bezier(0.32,0.72,0,1);
+    }
+    .editor-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 18px;
+    }
+    .editor-header h2 { font-size: 18px; font-weight: 600; letter-spacing: -0.3px; }
+    .close-btn {
+      width: 28px; height: 28px; border-radius: 50%;
+      background: #2c2c2e; border: none; color: white;
+      font-size: 17px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      line-height: 1;
+    }
+    .form-group { margin-bottom: 14px; }
+    .form-group label {
+      display: block; font-size: 13px; color: #8e8e93;
+      margin-bottom: 5px; font-weight: 400;
+    }
+    .form-group input, .form-group select, .form-group textarea {
+      width: 100%; background: #2c2c2e; border: none;
+      border-radius: 10px; padding: 12px 13px; color: white;
+      font-size: 16px; outline: none;
+      -webkit-user-select: text; user-select: text;
+      font-family: inherit;
+    }
+    .form-group input:focus, .form-group select:focus {
+      box-shadow: 0 0 0 2px #0a84ff;
+    }
+    .form-row { display: flex; gap: 10px; }
+    .form-row .form-group { flex: 1; }
+    .color-row { display: flex; gap: 9px; flex-wrap: wrap; }
+    .color-swatch {
+      width: 34px; height: 34px; border-radius: 50%;
+      border: 2.5px solid transparent; cursor: pointer;
+    }
+    .color-swatch.selected { border-color: white; }
+    .btn-row { display: flex; gap: 10px; margin-top: 20px; }
+    .btn {
+      flex: 1; padding: 13px; border: none; border-radius: 12px;
+      font-size: 16px; font-weight: 600; cursor: pointer;
+      font-family: inherit;
+    }
+    .btn-primary { background: #0a84ff; color: white; }
+    .btn-danger { background: #ff453a; color: white; }
+    .btn-secondary { background: #2c2c2e; color: white; }
+    .upload-area {
+      border: 1.5px dashed rgba(255,255,255,0.25);
+      border-radius: 10px; padding: 18px; text-align: center;
+      color: #8e8e93; cursor: pointer; font-size: 14px;
+    }
+    .upload-area input { display: none; }
+    .preview-img {
+      max-width: 100%; max-height: 100px; border-radius: 8px; margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="status-bar"></div>
+
+    <!-- MAIN WALLET VIEW -->
+    <div id="wallet-view" class="view active">
+      <div class="header">
+        <h1>Wallet</h1>
+        <div class="header-right">
+          <button type="button" class="circle-btn" id="plus-btn">+</button>
+          <button type="button" class="pill-btn" id="more-btn">
+            <span style="font-size:15px;">▣</span>
+            <span class="dots">•••</span>
+          </button>
+        </div>
+      </div>
+      <div class="card-stack" id="card-stack"></div>
+    </div>
+
+    <!-- CARD DETAIL VIEW -->
+    <div id="detail-view" class="view">
+      <div class="detail-top">
+        <button type="button" class="back-circle" id="back-btn">‹</button>
+        <div class="detail-card" id="detail-card"></div>
+        <div class="stats-row">
+          <div class="stat-card">
+            <div class="stat-label">Available Balance</div>
+            <div class="stat-value" id="balance-value">£0.00</div>
+          </div>
+          <button class="stat-card activity-stat-card" id="weekly-activity-btn" type="button">
+            <div class="stat-label">Weekly Activity</div>
+            <div class="activity-bars" id="activity-bars"></div>
+          </button>
+        </div>
+        <div class="updated">Updated just now</div>
+        <div class="section-title">Latest Transactions</div>
+        <div class="tx-list" id="transactions-list"></div>
+      </div>
+    </div>
+
+    <!-- SPENDING ACTIVITY VIEW -->
+    <div id="activity-view" class="view">
+      <div class="activity-nav">
+        <button type="button" class="activity-back" id="activity-back-btn" aria-label="Back">‹</button>
+        <div class="period-switch" role="tablist" aria-label="Spending period">
+          <button type="button" class="period-btn selected" data-period="week" role="tab">Week</button>
+          <button type="button" class="period-btn" data-period="month" role="tab">Month</button>
+          <button type="button" class="period-btn" data-period="year" role="tab">Year</button>
+        </div>
+      </div>
+      <div class="activity-content" id="activity-content"></div>
+    </div>
+
+    <!-- WALLET SEARCH VIEW -->
+    <div id="search-view" class="view search-view">
+      <div class="search-page">
+        <div class="search-page-title" id="search-page-title">Suggestions</div>
+        <div class="search-suggestions" id="search-suggestions"></div>
+
+        <div class="search-section-title" id="search-recent-title">Recent <span class="search-see-all" id="search-see-all">See All</span></div>
+        <div class="search-results-card" id="search-recent"></div>
+
+        <div class="search-section-title" id="search-categories-title">Categories</div>
+        <div class="search-horizontal" id="search-categories"></div>
+
+        <div class="search-section-title" id="search-merchants-title">Merchants</div>
+        <div class="search-horizontal" id="search-merchants"></div>
+
+        <div class="search-section-title" id="search-matches-title" style="display:none;">Transactions</div>
+        <div class="search-results-card" id="search-matches" style="display:none;"></div>
+      </div>
+    </div>
+
+    <!-- TRANSACTION DETAIL VIEW -->
+    <div id="tx-detail-view" class="view">
+      <div class="detail-top">
+        <button type="button" class="back-circle" id="tx-back-btn">‹</button>
+      </div>
+      <div class="tx-detail" id="tx-detail-content"></div>
+    </div>
+  </div>
+
+  <button type="button" class="fab-search" id="fab-search" aria-label="Search Wallet">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round">
+      <circle cx="11" cy="11" r="7"/>
+      <path d="M21 21l-4.3-4.3"/>
+    </svg>
+  </button>
+
+  <div class="search-dock" id="search-dock">
+    <div class="search-input-wrap">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+      <input id="wallet-search-input" type="search" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="Search in Wallet" aria-label="Search in Wallet">
+      <button type="button" class="search-clear" id="wallet-search-clear" aria-label="Clear search">×</button>
+    </div>
+    <button type="button" class="search-close" id="wallet-search-close" aria-label="Close search">×</button>
+  </div>
+
+  <!-- + ACTION SHEET -->
+  <div class="sheet-overlay" id="plus-sheet">
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">Wallet</div>
+      <div class="sheet-item" id="action-add-card">
+        <span class="icon">＋</span> Add Card
+      </div>
+      <div class="sheet-item" id="action-edit-cards">
+        <span class="icon">✎</span> Edit / Manage Cards
+      </div>
+      <div class="sheet-item" id="action-add-tx">
+        <span class="icon">↗</span> Add Transaction
+      </div>
+      <div class="sheet-cancel" id="sheet-cancel">Cancel</div>
+    </div>
+  </div>
+
+  <!-- EDITOR OVERLAY -->
+  <div class="editor-overlay" id="editor-overlay">
+    <div class="editor-panel" id="editor-panel"></div>
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'wallet_sim_v3';
+    const CURRENCIES = {
+      USD: { code: 'USD', locale: 'en-US', symbol: '$' },
+      GBP: { code: 'GBP', locale: 'en-GB', symbol: '£' },
+      EUR: { code: 'EUR', locale: 'de-DE', symbol: '€' },
+      CAD: { code: 'CAD', locale: 'en-CA', symbol: 'C$' },
+      AUD: { code: 'AUD', locale: 'en-AU', symbol: 'A$' },
+      JPY: { code: 'JPY', locale: 'ja-JP', symbol: '¥' }
+    };
+    const BG_COLORS = ['bg-blue','bg-black','bg-gold','bg-silver','bg-purple','bg-green','bg-red','bg-indigo'];
+
+    let cards = [];
+    let currentCardId = null;
+    let currentTxId = null;
+    let dragState = null;
+    let activityPeriod = 'week';
+    let activityReturnView = 'detail-view';
+    let searchReturnView = 'wallet-view';
+    let searchQuery = '';
+    let searchFilter = null;
+
+    // ========== STORAGE ==========
+    function loadData() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          cards = JSON.parse(raw);
+          cards.forEach(c => {
+            if (!c.currency) c.currency = 'GBP';
+            if (!c.transactions) c.transactions = [];
+            c.transactions.forEach(t => {
+              if (!t.datetime) t.datetime = (t.date || '2026-10-01') + 'T12:00';
+            });
+          });
+        } else {
+          cards = getDefaultCards();
+          saveData();
+        }
+      } catch (e) {
+        cards = getDefaultCards();
+      }
+    }
+    function saveData() {
+      try {
+        const payload = JSON.stringify(cards);
+        localStorage.setItem(STORAGE_KEY, payload);
+        return true;
+      } catch (e) {
+        console.error('Unable to save wallet data:', e);
+        showSaveError('Your wallet data could not be saved. If you added a card image, try removing it or use a smaller image.');
+        return false;
+      }
+    }
+
+    function showSaveError(message) {
+      let el = document.getElementById('save-error');
+      if (!el) {
+        el = document.createElement('div');
+        el.id = 'save-error';
+        el.style.cssText = 'position:fixed;left:16px;right:16px;bottom:18px;z-index:9999;background:#3a1d1d;color:#fff;padding:14px 16px;border-radius:14px;font-size:14px;box-shadow:0 8px 30px rgba(0,0,0,.35);';
+        document.body.appendChild(el);
+      }
+      el.textContent = message;
+      clearTimeout(window.__saveErrorTimer);
+      window.__saveErrorTimer = setTimeout(() => el.remove(), 5000);
+    }
+
+    function showSaveToast(message) {
+      let el = document.getElementById('save-toast');
+      if (!el) {
+        el = document.createElement('div');
+        el.id = 'save-toast';
+        el.style.cssText = 'position:fixed;left:16px;right:16px;bottom:18px;z-index:9999;background:#1c1c1e;color:#fff;padding:14px 16px;border-radius:14px;font-size:14px;text-align:center;box-shadow:0 8px 30px rgba(0,0,0,.35);';
+        document.body.appendChild(el);
+      }
+      el.textContent = message;
+      clearTimeout(window.__saveToastTimer);
+      window.__saveToastTimer = setTimeout(() => el.remove(), 2200);
+    }
+
+    function saveAndRefresh(onSuccess) {
+      if (saveData()) {
+        if (typeof onSuccess === 'function') onSuccess();
+        return true;
+      }
+      return false;
+    }
+    function getDefaultCards() {
+      return [
+        {
+          id: 'c1', name: 'Trading 212', lastFour: '', network: 'Virtual', currency: 'GBP',
+          bg: 'bg-black', customImage: null, balance: 0,
+          transactions: []
+        },
+        {
+          id: 'c2', name: 'American Express', lastFour: '6307', network: 'Amex', currency: 'GBP',
+          bg: 'bg-black', customImage: null, balance: 211.56,
+          transactions: [
+            { id: 't1', merchant: 'Holder S&tj', amount: 35.00, datetime: '2026-10-04T23:00', note: 'Transfer', category: 'income' },
+            { id: 't2', merchant: 'Esso', amount: -5.25, datetime: '2026-10-04T22:50', note: '', category: 'transport' },
+            { id: 't3', merchant: 'Esso', amount: -4.45, datetime: '2026-10-04T22:40', note: '', category: 'transport' }
+          ]
+        }
+      ];
+    }
+
+    // ========== RENDER MAIN ==========
+    function renderCardStack() {
+      const stack = document.getElementById('card-stack');
+      stack.innerHTML = '';
+      document.getElementById('fab-search').style.display = 'flex';
+      if (cards.length === 0) {
+        stack.innerHTML = '<div class="empty-cards">No cards yet.<br>Tap + to add one.</div>';
+        return;
+      }
+      cards.forEach((card, i) => {
+        const el = document.createElement('div');
+        el.className = 'wallet-card ' + (card.customImage ? '' : card.bg);
+        el.dataset.id = card.id;
+        if (card.customImage) el.style.backgroundImage = 'url(' + card.customImage + ')';
+        el.innerHTML = `
+          <div class="card-inner">
+            <div class="card-top-row"></div>
+            <div class="card-bottom-row">
+              <div class="card-last4">${card.lastFour ? '•••• ' + esc(card.lastFour) : ''}</div>
+              <div></div>
+            </div>
+          </div>`;
+        el.addEventListener('click', (e) => {
+          if (dragState && dragState.moved) return;
+          openCardDetail(card.id);
+        });
+        setupCardDrag(el);
+        stack.appendChild(el);
+      });
+    }
+
+    // ========== WALLET SEARCH ==========
+    const SEARCH_CATEGORIES = [
+      {name:'Transport', icon:'🚗', bg:'#4b8ff0'},
+      {name:'Entertainment', icon:'★', bg:'#d16bc9'},
+      {name:'Services', icon:'▤', bg:'#9270e8'},
+      {name:'Health', icon:'♥', bg:'#eb6868'},
+      {name:'Travel', icon:'✈', bg:'#58bd49'}
+    ];
+
+    function allTransactions() {
+      return cards.flatMap(card => (card.transactions || []).map(tx => ({...tx, cardId:card.id, cardName:card.name, currency:card.currency || 'GBP'})));
+    }
+    function txSort(a,b) { return (b.datetime || '').localeCompare(a.datetime || ''); }
+    function merchantInitial(merchant) { return String(merchant || 'T').trim().charAt(0).toUpperCase() || 'T'; }
+    // Search transaction rows intentionally use a neutral icon rather than merchant logos.
+    // This keeps the transaction list clean and matches the requested Wallet-style presentation.
+    function txIcon(tx) {
+      return tx.amount > 0 ? '↩' : '›';
+    }
+    function txIconStyle(tx) {
+      if (tx.amount > 0) return 'background:#1c1c1e;color:#fff;border:1px solid #666;font-size:28px;';
+      return 'background:#2c2c2e;color:#fff;border:1px solid rgba(255,255,255,.18);font-size:30px;';
+    }
+    function searchResultRow(tx) {
+      const currency = CURRENCIES[tx.currency] || CURRENCIES.GBP;
+      const d = tx.datetime ? new Date(tx.datetime) : null;
+      const date = d && !Number.isNaN(d.getTime()) ? d.toLocaleDateString('en-GB') : '';
+      const amount = formatMoney(Math.abs(Number(tx.amount) || 0), currency);
+      const prefix = Number(tx.amount) > 0 ? '+' : '';
+      return `<div class="search-result-row" data-search-tx="${esc(tx.cardId)}|${esc(tx.id)}">
+        <div class="search-result-icon" style="${txIconStyle(tx)}">${esc(txIcon(tx))}</div>
+        <div class="search-result-main">
+          <div class="search-result-title">${esc(tx.merchant || 'Transaction')}</div>
+          <div class="search-result-sub">${tx.amount > 0 ? 'Refund' : (tx.note ? esc(tx.note) + ' · ' : '')}${date}${tx.cardName ? ' — ' + esc(tx.cardName) + '...' : ''}</div>
+        </div>
+        <div class="search-result-amount ${tx.amount > 0 ? 'credit' : ''}">${prefix}${amount}</div>
+        <div class="search-chevron">›</div>
+      </div>`;
+    }
+    function renderSearchResults() {
+      const recentEl = document.getElementById('search-recent');
+      const matchesEl = document.getElementById('search-matches');
+      const titleEl = document.getElementById('search-matches-title');
+      const q = searchQuery.trim().toLowerCase();
+      const isQueryMode = !!q || !!searchFilter;
+      const hideIds = ['search-page-title','search-suggestions','search-recent-title','search-categories-title','search-merchants-title','search-categories','search-merchants'];
+      hideIds.forEach(id => { const el=document.getElementById(id); if(el) el.style.display=isQueryMode?'none':''; });
+      let txs = allTransactions().sort(txSort);
+      if (searchFilter && searchFilter !== '__all__' && !q) txs = txs.filter(tx => String(tx.category || '').toLowerCase() === searchFilter.toLowerCase());
+      const recent = txs.slice(0, 3);
+      recentEl.innerHTML = recent.length ? recent.map(searchResultRow).join('') : '<div class="search-empty">No transactions yet.</div>';
+      if (isQueryMode) {
+        const matches = txs.filter(tx => !q || String(tx.merchant || '').toLowerCase().includes(q));
+        titleEl.style.display = 'flex';
+        titleEl.innerHTML = `Transactions <span class="search-see-all">${matches.length}</span>`;
+        matchesEl.style.display = 'block';
+        matchesEl.innerHTML = matches.length ? matches.map(searchResultRow).join('') : '<div class="search-empty">No matching transactions.</div>';
+      } else {
+        titleEl.style.display = 'none';
+        matchesEl.style.display = 'none';
+      }
+      document.querySelectorAll('[data-search-tx]').forEach(el => {
+        el.onclick = () => { const [cid,tid] = el.dataset.searchTx.split('|'); closeSearch(); openTxDetail(cid, tid); };
+      });
+    }
+    function renderSearchHome() {
+      const searchSuggestions = document.getElementById('search-suggestions');
+      const suggestionSvg = `<span class="search-icon-large"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M16 16l5 5"/></svg></span>`;
+      searchSuggestions.innerHTML = [
+        ['Payment Cards', ()=>{closeSearch(); openManageCards();}],
+        ['Transactions', ()=>{ searchFilter=null; searchQuery=''; renderSearchResults(); document.getElementById('wallet-search-input').focus(); }],
+        ['Passes & Tickets', ()=>{ searchFilter='__passes__'; renderSearchResults(); }],
+        ['Orders', ()=>{ searchFilter='__orders__'; renderSearchResults(); }]
+      ].map((x,i)=>`<div class="search-suggestion" data-suggestion="${i}">${suggestionSvg}<span>${x[0]}</span></div>`).join('');
+      document.querySelectorAll('.search-suggestion').forEach((el,i)=>el.onclick=()=>[
+        ()=>{closeSearch();openManageCards();},
+        ()=>{searchFilter=null;searchQuery='';document.getElementById('wallet-search-input').focus();renderSearchResults();},
+        ()=>{searchFilter='__passes__';renderSearchResults();},
+        ()=>{searchFilter='__orders__';renderSearchResults();}
+      ][i]());
+
+      document.getElementById('search-categories').innerHTML = SEARCH_CATEGORIES.map(c=>`<div class="search-tile" data-category="${esc(c.name.toLowerCase())}"><div class="search-tile-icon" style="background:${c.bg};color:#fff">${c.icon}</div><div class="search-tile-label">${esc(c.name)}</div></div>`).join('');
+      document.querySelectorAll('[data-category]').forEach(el=>el.onclick=()=>{searchFilter=el.dataset.category;searchQuery='';document.getElementById('wallet-search-input').value='';renderSearchResults();document.getElementById('search-view').scrollTop=document.getElementById('search-view').scrollHeight;});
+
+      const merchants = [...new Map(allTransactions().sort(txSort).map(tx=>[String(tx.merchant||'').toLowerCase(),tx])).values()].slice(0,8);
+      document.getElementById('search-merchants').innerHTML = merchants.length ? merchants.map(tx=>`<div class="search-tile" data-merchant="${esc(tx.merchant)}"><div class="search-tile-icon" style="${txIconStyle(tx)}">${esc(txIcon(tx))}</div><div class="search-tile-label">${esc(tx.merchant)}</div></div>`).join('') : '<div class="search-empty">No merchants yet.</div>';
+      document.querySelectorAll('[data-merchant]').forEach(el=>el.onclick=()=>{searchFilter=null;searchQuery=el.dataset.merchant;document.getElementById('wallet-search-input').value=searchQuery;renderSearchResults();document.getElementById('search-view').scrollTop=0;});
+      renderSearchResults();
+    }
+    function openSearch(returnView='wallet-view', focus=false) {
+      searchReturnView = returnView;
+      searchQuery=''; searchFilter=null;
+      ['wallet-view','detail-view','activity-view','tx-detail-view'].forEach(id=>document.getElementById(id).classList.remove('active'));
+      document.getElementById('search-view').classList.add('active');
+      document.getElementById('fab-search').style.display='none';
+      document.getElementById('search-dock').classList.add('open');
+      const input=document.getElementById('wallet-search-input'); input.value='';
+      renderSearchHome();
+      document.getElementById('search-view').scrollTop=0;
+      if(focus) setTimeout(()=>input.focus(),80);
+    }
+    function closeSearch() {
+      document.getElementById('search-dock').classList.remove('open');
+      document.getElementById('search-view').classList.remove('active');
+      document.getElementById(searchReturnView).classList.add('active');
+      if(searchReturnView==='wallet-view') document.getElementById('fab-search').style.display='flex';
+      else if(searchReturnView==='detail-view') document.getElementById('fab-search').style.display='flex';
+    }
+
+    // ========== CARD DETAIL ==========
+    function openCardDetail(id) {
+      currentCardId = id;
+      const card = cards.find(c => c.id === id);
+      if (!card) return;
+
+      document.getElementById('wallet-view').classList.remove('active');
+      document.getElementById('tx-detail-view').classList.remove('active');
+      document.getElementById('activity-view').classList.remove('active');
+      document.getElementById('detail-view').classList.add('active');
+      document.getElementById('fab-search').style.display = 'flex';
+
+      const detailCard = document.getElementById('detail-card');
+      detailCard.className = 'detail-card ' + (card.customImage ? '' : card.bg);
+      detailCard.style.backgroundImage = card.customImage ? 'url(' + card.customImage + ')' : '';
+      detailCard.innerHTML = `
+        <div class="card-inner">
+          <div class="card-top-row"></div>
+          <div class="card-bottom-row">
+            <div class="card-last4">${card.lastFour ? '•••• ' + esc(card.lastFour) : ''}</div>
+            <div></div>
+          </div>
+        </div>`;
+
+      const currency = CURRENCIES[card.currency] || CURRENCIES.GBP;
+      // Calculate balance from transactions if not set
+      let bal = card.balance;
+      if (bal === undefined || bal === null) {
+        bal = card.transactions.reduce((sum, t) => sum + t.amount, 0);
+      }
+      document.getElementById('balance-value').textContent = formatMoney(bal, currency);
+
+      renderTransactions(card);
+      renderMiniActivity(card);
+    }
+
+    function renderTransactions(card) {
+      const list = document.getElementById('transactions-list');
+      if (!card.transactions || card.transactions.length === 0) {
+        list.innerHTML = '<div style="padding:30px;text-align:center;color:var(--muted);">No transactions yet.<br>Use + to add some.</div>';
+        return;
+      }
+      const sorted = card.transactions.slice().sort((a,b) => (b.datetime || '').localeCompare(a.datetime || ''));
+      const currency = CURRENCIES[card.currency] || CURRENCIES.GBP;
+
+      list.innerHTML = sorted.map(tx => {
+        const timeStr = relativeTime(tx.datetime);
+        const isCredit = tx.amount > 0;
+        const sub = tx.note ? esc(tx.note) + ' · ' + timeStr : timeStr;
+        return `
+          <div class="tx-item" data-txid="${tx.id}">
+            <div class="tx-info">
+              <div class="tx-merchant">${esc(tx.merchant)}</div>
+              <div class="tx-sub">${sub}</div>
+            </div>
+            <div class="tx-right">
+              <span class="tx-amount ${isCredit ? 'credit' : ''}">${isCredit ? '+' : ''}${formatMoney(Math.abs(tx.amount), currency)}</span>
+              <span class="tx-chevron">›</span>
+            </div>
+          </div>`;
+      }).join('');
+
+      list.querySelectorAll('.tx-item').forEach(el => {
+        let timer = null, longPress = false;
+        el.addEventListener('click', () => { if (longPress) { longPress=false; return; } openTxDetail(card.id, el.dataset.txid); });
+        const start=()=>{ clearTimeout(timer); timer=setTimeout(()=>{ longPress=true; openTransactionActions(card.id, el.dataset.txid); },600); };
+        const cancel=()=>clearTimeout(timer);
+        el.addEventListener('touchstart',start,{passive:true}); el.addEventListener('touchend',cancel); el.addEventListener('touchcancel',cancel); el.addEventListener('touchmove',cancel);
+        el.addEventListener('mousedown',start); el.addEventListener('mouseup',cancel); el.addEventListener('mouseleave',cancel);
+      });
+    }
+
+    // Hidden transaction menu: long-press any transaction.
+    function openTransactionActions(cardId, txId) {
+      const card=cards.find(c=>c.id===cardId), tx=card && card.transactions.find(t=>t.id===txId); if(!card||!tx)return;
+      const panel=document.getElementById('editor-panel');
+      panel.innerHTML=`<div class="editor-header"><h2>Transaction</h2><button type="button" class="close-btn" id="close-editor">×</button></div><div style="background:var(--surface-2);border-radius:12px;padding:14px;margin-bottom:12px;"><div style="font-size:16px;font-weight:500;">${esc(tx.merchant)}</div><div style="font-size:13px;color:var(--muted);margin-top:3px;">${formatMoney(Math.abs(tx.amount),CURRENCIES[card.currency]||CURRENCIES.GBP)} · ${relativeTime(tx.datetime)}</div></div><button type="button" class="btn btn-secondary" id="hidden-edit-tx" style="width:100%;margin-bottom:10px;">Edit Transaction</button><button type="button" class="btn btn-danger" id="hidden-delete-tx" style="width:100%;">Delete Transaction</button>`;
+      document.getElementById('editor-overlay').classList.add('open'); document.getElementById('close-editor').onclick=closeEditor;
+      document.getElementById('hidden-edit-tx').onclick=()=>openTransactionEditor(cardId,txId);
+      document.getElementById('hidden-delete-tx').onclick=()=>{ if(!confirm(`Delete "${tx.merchant}"?`))return; card.balance=(Number(card.balance)||0)-(Number(tx.amount)||0); card.transactions=card.transactions.filter(t=>t.id!==txId); if (!saveData()) return; closeEditor(); openCardDetail(cardId); };
+    }
+
+    // ========== SPENDING ACTIVITY ==========
+    function startOfDay(d) { return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
+    function startOfWeek(d) {
+      const x = startOfDay(d);
+      const day = x.getDay();
+      const diff = day === 0 ? -6 : 1 - day; // Monday start
+      x.setDate(x.getDate() + diff);
+      return x;
+    }
+    function endOfWeek(d) { const x = startOfWeek(d); x.setDate(x.getDate() + 6); return x; }
+    function moneyNumber(v) { return Math.round((Number(v) || 0) * 100) / 100; }
+    function isSpending(tx) { return Number(tx.amount) < 0 && String(tx.category || '').toLowerCase() !== 'transfer'; }
+    function txDate(tx) { const d = new Date(tx.datetime || tx.date || ''); return isNaN(d) ? null : d; }
+    function getPeriodRange(period, card) {
+      const dates = (card.transactions || []).map(txDate).filter(Boolean);
+      const anchor = dates.length ? new Date(Math.max(...dates.map(d => d.getTime()))) : new Date();
+      if (period === 'week') return { start: startOfWeek(anchor), end: endOfWeek(anchor) };
+      if (period === 'month') return { start: new Date(anchor.getFullYear(), anchor.getMonth(), 1), end: new Date(anchor.getFullYear(), anchor.getMonth()+1, 0) };
+      return { start: new Date(anchor.getFullYear(), 0, 1), end: new Date(anchor.getFullYear(), 11, 31) };
+    }
+    function inRange(tx, range) {
+      const d = txDate(tx); if (!d) return false;
+      const day = startOfDay(d);
+      return day >= startOfDay(range.start) && day <= startOfDay(range.end);
+    }
+    function formatActivityRange(range, period) {
+      if (period === 'year') return String(range.start.getFullYear());
+      if (period === 'month') return range.start.toLocaleDateString('en-GB',{month:'long',year:'numeric'});
+      const sameMonth = range.start.getMonth() === range.end.getMonth();
+      if (sameMonth) return `${range.start.getDate()}–${range.end.getDate()} ${range.end.toLocaleDateString('en-GB',{month:'short'})}`;
+      return `${range.start.getDate()} ${range.start.toLocaleDateString('en-GB',{month:'short'})} – ${range.end.getDate()} ${range.end.toLocaleDateString('en-GB',{month:'short'})}`;
+    }
+    function renderMiniActivity(card) {
+      const host = document.getElementById('activity-bars');
+      if (!host) return;
+      const range = getPeriodRange('week', card);
+      const vals = Array.from({length:7}, (_,i) => {
+        const day = new Date(range.start); day.setDate(day.getDate()+i);
+        return (card.transactions || []).filter(tx => isSpending(tx) && inRange(tx,{start:day,end:day})).reduce((s,tx)=>s+Math.abs(Number(tx.amount)||0),0);
+      });
+      const max = Math.max(...vals, 0.01);
+      host.innerHTML = vals.map(v => `<span class="${v>0?'active':''}" style="height:${Math.max(5,Math.round((v/max)*100))}%"></span>`).join('');
+    }
+    function categoryInfo(name) {
+      const n = String(name||'').toLowerCase();
+      if (n.includes('transport') || n.includes('fuel') || n.includes('car') || n.includes('travel')) return {title:'Transport', icon:'car', color:'blue'};
+      if (n.includes('food') || n.includes('drink') || n.includes('restaurant') || n.includes('dining')) return {title:'Food & Drink', icon:'food', color:'orange'};
+      if (n.includes('health') || n.includes('gym') || n.includes('medical')) return {title:'Health', icon:'heart', color:'red'};
+      if (n.includes('shopping') || n.includes('retail')) return {title:'Shopping', icon:'bag', color:'blue'};
+      return {title:name ? String(name).trim().replace(/^./,c=>c.toUpperCase()) : 'Other', icon:'other', color:'dark'};
+    }
+    function inferCategory(tx) {
+      if (tx.category) return categoryInfo(tx.category);
+      const m = String(tx.merchant||'').toLowerCase();
+      if (/esso|uber|taxi|train|bus|fuel|petrol/.test(m)) return categoryInfo('transport');
+      if (/mcdonald|tesco|cafe|coffee|restaurant|pub|wetherspoon|food/.test(m)) return categoryInfo('food & drink');
+      if (/gym|doctor|pharmacy|health/.test(m)) return categoryInfo('health');
+      return categoryInfo('other');
+    }
+    function iconSvg(type) {
+      const common='fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
+      if(type==='car') return `<svg viewBox="0 0 24 24" ${common}><path d="M5 17h14l-1.2-6.2a2 2 0 0 0-2-1.6H8.2a2 2 0 0 0-2 1.6L5 17Z"/><path d="M4 17v2m16-2v2M7 13h10"/><circle cx="7.5" cy="17" r="1"/><circle cx="16.5" cy="17" r="1"/></svg>`;
+      if(type==='food') return `<svg viewBox="0 0 24 24" ${common}><path d="M7 3v8M5 3v5M9 3v5M7 11v10M16 3v18M16 3c3 2 3 6 0 8"/></svg>`;
+      if(type==='heart') return `<svg viewBox="0 0 24 24" ${common}><path d="M20.8 8.7c0 5.3-8.8 10.3-8.8 10.3S3.2 14 3.2 8.7A4.7 4.7 0 0 1 12 6.2a4.7 4.7 0 0 1 8.8 2.5Z"/><path d="M8 11h2l1-2 2 4 1-2h2"/></svg>`;
+      if(type==='bag') return `<svg viewBox="0 0 24 24" ${common}><path d="M5 8h14l-1 12H6L5 8Z"/><path d="M9 8a3 3 0 0 1 6 0"/></svg>`;
+      if(type==='income') return `<svg viewBox="0 0 24 24" ${common}><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 12h10M12 8v8"/></svg>`;
+      if(type==='transfer') return `<svg viewBox="0 0 24 24" ${common}><path d="M4 8h14l-3-3M20 16H6l3 3"/></svg>`;
+      return `<svg viewBox="0 0 24 24" ${common}><circle cx="12" cy="12" r="8"/><path d="M9 12h6"/></svg>`;
+    }
+    function txKind(tx) {
+      const c = String(tx.category||'').toLowerCase();
+      if (Number(tx.amount)>0 || c==='income') return 'income';
+      if (c==='transfer') return 'transfer';
+      return 'spending';
+    }
+    function renderActivity() {
+      const card = cards.find(c=>c.id===currentCardId);
+      if (!card) return;
+      const range = getPeriodRange(activityPeriod, card);
+      const txs = (card.transactions||[]).filter(tx=>inRange(tx,range));
+      const spending = txs.filter(isSpending);
+      const total = moneyNumber(spending.reduce((s,t)=>s+Math.abs(Number(t.amount)||0),0));
+      const currency = CURRENCIES[card.currency] || CURRENCIES.GBP;
+      const fmt = v => formatMoney(v,currency);
+      let previousTotal = 0;
+      if (activityPeriod === 'week') {
+        const prev = {start:new Date(range.start),end:new Date(range.end)}; prev.start.setDate(prev.start.getDate()-7); prev.end.setDate(prev.end.getDate()-7);
+        previousTotal = moneyNumber((card.transactions||[]).filter(tx=>isSpending(tx)&&inRange(tx,prev)).reduce((s,t)=>s+Math.abs(Number(t.amount)||0),0));
+      }
+      const diff = moneyNumber(previousTotal-total);
+      const summary = activityPeriod==='week' && previousTotal>0
+        ? (diff>=0 ? `You spent ${fmt(diff)} less than the previous week.` : `You spent ${fmt(Math.abs(diff))} more than the previous week.`)
+        : (spending.length ? `${spending.length} spending transaction${spending.length===1?'':'s'} in this period.` : 'No spending transactions in this period.');
+
+      let chartDays=[];
+      if(activityPeriod==='week') {
+        chartDays=Array.from({length:7},(_,i)=>{const d=new Date(range.start);d.setDate(d.getDate()+i);return d;});
+      } else if(activityPeriod==='month') {
+        const days=range.end.getDate();
+        const step=Math.ceil(days/7);
+        chartDays=Array.from({length:7},(_,i)=>{const d=new Date(range.start);d.setDate(Math.min(days,1+i*step));return d;});
+      } else {
+        chartDays=Array.from({length:7},(_,i)=>new Date(range.start.getFullYear(),i*2,1));
+      }
+      const chartVals=chartDays.map(d=>{
+        if(activityPeriod==='week') return spending.filter(tx=>{const td=txDate(tx);return td&&startOfDay(td).getTime()===startOfDay(d).getTime();}).reduce((s,t)=>s+Math.abs(Number(t.amount)||0),0);
+        if(activityPeriod==='month') return spending.filter(tx=>{const td=txDate(tx);return td&&td.getMonth()===d.getMonth()&&td.getFullYear()===d.getFullYear();}).reduce((s,t)=>s+Math.abs(Number(t.amount)||0),0);
+        return spending.filter(tx=>{const td=txDate(tx);return td&&td.getMonth()===d.getMonth()&&td.getFullYear()===d.getFullYear();}).reduce((s,t)=>s+Math.abs(Number(t.amount)||0),0);
+      });
+      const maxChart=Math.max(...chartVals,1);
+      const labels=activityPeriod==='week'?['Mon','Tue','Wed','Thu','Fri','Sat','Sun']:activityPeriod==='month'?chartDays.map(d=>d.toLocaleDateString('en-GB',{day:'numeric'})):chartDays.map(d=>d.toLocaleDateString('en-GB',{month:'short'}));
+      const gridMax=Math.ceil(maxChart/10)*10 || 10;
+      const grid=[gridMax,Math.round(gridMax/2),0];
+
+      const categories={};
+      spending.forEach(tx=>{const info=inferCategory(tx);if(!categories[info.title])categories[info.title]={...info,total:0,count:0};categories[info.title].total+=Math.abs(Number(tx.amount)||0);categories[info.title].count++;});
+      const categoryRows=Object.values(categories).sort((a,b)=>b.total-a.total);
+      const merchants={};
+      spending.forEach(tx=>{const key=tx.merchant||'Unknown';if(!merchants[key])merchants[key]={merchant:key,total:0,count:0};merchants[key].total+=Math.abs(Number(tx.amount)||0);merchants[key].count++;});
+      const merchantRows=Object.values(merchants).sort((a,b)=>b.total-a.total).slice(0,10);
+      const largest=spending.slice().sort((a,b)=>Math.abs(Number(b.amount)||0)-Math.abs(Number(a.amount)||0)).slice(0,3);
+      const otherGroups={income:{title:'Income',count:0,total:0},transfer:{title:'Transfers',count:0,total:0}};
+      txs.filter(tx=>!isSpending(tx)).forEach(tx=>{const k=txKind(tx);otherGroups[k].count++;otherGroups[k].total+=Number(tx.amount)||0;});
+      const other=Object.values(otherGroups).filter(g=>g.count>0);
+      const avg=activityPeriod==='week'?moneyNumber(total/7):moneyNumber(total/(activityPeriod==='month'?range.end.getDate():365));
+
+      const rowHtml=(rows,type)=>rows.length?rows.map(r=>{
+        if(type==='category') {
+          const noIcon = r.icon === 'other';
+          return `<div class="activity-row ${noIcon ? 'activity-row-no-icon' : ''}">${noIcon ? '' : `<div class="activity-icon icon-${r.color}">${iconSvg(r.icon)}</div>`}<div class="activity-row-main"><div class="activity-row-title">${esc(r.title)}</div><div class="activity-row-sub">${r.count} Transaction${r.count===1?'':'s'}</div></div><div class="activity-row-right"><div class="activity-row-amount">${fmt(r.total)}</div><div class="activity-row-meta">↓ ${fmt(r.total)}</div></div><div class="activity-chevron">›</div></div>`;
+        }
+        return `<div class="activity-row"><div class="activity-icon icon-${inferCategory({merchant:r.merchant}).color}">${iconSvg(inferCategory({merchant:r.merchant}).icon)}</div><div class="activity-row-main"><div class="activity-row-title">${esc(r.merchant)}</div><div class="activity-row-sub">${r.count} Transaction${r.count===1?'':'s'}</div></div><div class="activity-row-right"><div class="activity-row-amount">${fmt(r.total)}</div></div><div class="activity-chevron">›</div></div>`;
+      }).join('') : '<div class="activity-row"><div class="activity-row-sub">No transactions</div></div>';
+
+      const largestHtml=largest.length?largest.map(tx=>{const d=txDate(tx);return `<div class="activity-row"><div class="activity-icon icon-${inferCategory(tx).color}">${iconSvg(inferCategory(tx).icon)}</div><div class="activity-row-main"><div class="activity-row-title">${esc(tx.merchant||'Transaction')}</div><div class="activity-row-sub">${esc(tx.note||'Direct Debit')}</div><div class="activity-row-sub">${d?d.toLocaleDateString('en-GB'):''}</div></div><div class="activity-row-right"><div class="activity-row-amount">${fmt(Math.abs(tx.amount))}</div></div><div class="activity-chevron">›</div></div>`;}).join(''):'<div class="activity-row"><div class="activity-row-sub">No spending transactions</div></div>';
+      const otherHtml=other.length?other.map(g=>{const kind=g.title==='Income'?'income':'transfer';return `<div class="activity-row"><div class="activity-icon icon-dark">${iconSvg(kind)}</div><div class="activity-row-main"><div class="activity-row-title">${g.title}</div><div class="activity-row-sub">${g.count} Transaction${g.count===1?'':'s'}</div></div><div class="activity-row-right"><div class="activity-row-amount">${g.total>0?'+':''}${fmt(Math.abs(g.total))}</div></div><div class="activity-chevron">›</div></div>`;}).join(''):'<div class="activity-row"><div class="activity-row-sub">No income or transfers</div></div>';
+
+      document.getElementById('activity-content').innerHTML=`
+        <div class="activity-date">${formatActivityRange(range,activityPeriod)}</div>
+        <section class="activity-section">
+          <div class="activity-section-title-row"><h2 class="activity-section-title">Total Spending</h2></div>
+          <div class="activity-card">
+            <div class="activity-kicker">${activityPeriod==='week'?'Total Spending':activityPeriod==='month'?'Monthly Spending':'Yearly Spending'}</div>
+            <div class="activity-total">${fmt(total)} <span style="font-size:22px;color:#fff">${activityPeriod==='week'&&previousTotal>0?(diff>=0?'↓':'↑'):''}</span></div>
+            <div class="activity-summary">${esc(summary)}</div>
+            <div class="activity-chart">
+              <div class="chart-grid">${grid.map(v=>`<div class="chart-grid-line"><span>${fmt(v).replace(/\.00$/,'')}</span></div>`).join('')}</div>
+              <div class="chart-bars">${chartVals.map(v=>`<div class="chart-col"><div class="chart-bar" style="height:${Math.max(v?3:1,Math.round((v/maxChart)*100))}%"></div></div>`).join('')}</div>
+              <div class="chart-labels">${labels.map(l=>`<span>${l}</span>`).join('')}</div>
+            </div>
+          </div>
+        </section>
+        <section class="activity-section">
+          <div class="segmented"><button type="button" class="selected" id="by-category-btn">By Category</button><button type="button" id="by-merchant-btn">By Merchant</button></div>
+          <div id="activity-breakdown" class="activity-list-card">${rowHtml(categoryRows,'category')}</div>
+        </section>
+        <section class="activity-section">
+          <div class="activity-section-title-row"><h2 class="activity-section-title">Highlights</h2><button class="activity-link" type="button" data-see-all="activity">See All</button></div>
+          <div class="activity-card" style="padding-top:28px">
+            <div style="font-size:19px;font-weight:600;background:linear-gradient(90deg,#c56de8,#ff9368);-webkit-background-clip:text;background-clip:text;color:transparent;margin-bottom:22px">Daily Average</div>
+            <div style="font-size:21px;line-height:1.55;font-weight:600">${activityPeriod==='week' && previousTotal>0 ? `You spent ${fmt(Math.abs(diff/7))} ${diff>=0?'less':'more'} per day compared to the previous week.` : `You spent ${fmt(avg)} per day in this period.`}</div>
+            <div style="margin-top:24px;border-top:1px solid rgba(84,84,88,.55);padding-top:22px">
+              <div style="font-size:40px;font-weight:600">${fmt(avg)}<span style="font-size:20px;color:#8e8e93">/day</span></div>
+              <div style="margin-top:18px;background:linear-gradient(90deg,#c56de8,#ff9368);border-radius:7px;height:36px;width:${Math.max(35,Math.min(100,previousTotal?avg/(previousTotal/7)*100:100))}%;display:flex;align-items:center;padding:0 10px;font-size:17px;font-weight:600">${activityPeriod==='week'?formatActivityRange(range,'week'):formatActivityRange(range,activityPeriod)}</div>
+              ${activityPeriod==='week'&&previousTotal>0?`<div style="font-size:40px;font-weight:600;margin-top:28px">${fmt(previousTotal/7)}<span style="font-size:20px;color:#8e8e93">/day</span></div><div style="margin-top:18px;background:#454548;border-radius:7px;height:36px;width:100%;display:flex;align-items:center;padding:0 10px;font-size:17px;font-weight:600">Previous week</div>`:''}
+            </div>
+          </div>
+        </section>
+        <section class="activity-section">
+          <div class="activity-section-title-row"><h2 class="activity-section-title">Largest Transactions</h2><button class="activity-link" type="button" data-see-all="activity">See All</button></div>
+          <div class="activity-list-card">${largestHtml}</div>
+        </section>
+        <section class="activity-section">
+          <div class="activity-section-title-row"><h2 class="activity-section-title">Frequent Merchants</h2></div>
+          <div class="activity-list-card">${rowHtml(merchantRows,'merchant')}</div>
+        </section>
+        <section class="activity-section">
+          <div class="activity-section-title-row"><h2 class="activity-section-title">Other Transactions</h2></div>
+          <div class="activity-list-card">${otherHtml}</div>
+          <div class="activity-note">These transactions are not counted towards your spending.</div>
+        </section>`;
+      document.querySelectorAll('.period-btn').forEach(btn=>btn.classList.toggle('selected',btn.dataset.period===activityPeriod));
+      document.getElementById('by-category-btn').onclick=()=>{document.getElementById('by-category-btn').classList.add('selected');document.getElementById('by-merchant-btn').classList.remove('selected');document.getElementById('activity-breakdown').innerHTML=rowHtml(categoryRows,'category');};
+      document.getElementById('by-merchant-btn').onclick=()=>{document.getElementById('by-merchant-btn').classList.add('selected');document.getElementById('by-category-btn').classList.remove('selected');document.getElementById('activity-breakdown').innerHTML=rowHtml(merchantRows,'merchant');};
+      document.querySelectorAll('[data-see-all="activity"]').forEach(btn=>btn.onclick=()=>openSearch('activity-view',true));
+    }
+    function openActivityView() {
+      if (!currentCardId) return;
+      activityReturnView = 'detail-view';
+      document.getElementById('detail-view').classList.remove('active');
+      document.getElementById('wallet-view').classList.remove('active');
+      document.getElementById('tx-detail-view').classList.remove('active');
+      document.getElementById('activity-view').classList.add('active');
+      document.getElementById('fab-search').style.display='none';
+      renderActivity();
+      document.getElementById('activity-view').scrollTop=0;
+    }
+
+    // ========== TRANSACTION DETAIL ==========
+    function openTxDetail(cardId, txId) {
+      currentCardId = cardId;
+      currentTxId = txId;
+      const card = cards.find(c => c.id === cardId);
+      const tx = card.transactions.find(t => t.id === txId);
+      if (!tx) return;
+
+      document.getElementById('detail-view').classList.remove('active');
+      document.getElementById('activity-view').classList.remove('active');
+      document.getElementById('tx-detail-view').classList.add('active');
+      document.getElementById('fab-search').style.display = 'none';
+
+      const currency = CURRENCIES[card.currency] || CURRENCIES.GBP;
+      const d = new Date(tx.datetime);
+      const dateStr = d.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' }) +
+        ', ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+
+      document.getElementById('tx-detail-content').innerHTML = `
+        <div class="tx-detail-amount">${formatMoney(Math.abs(tx.amount), currency)}</div>
+        <div class="tx-detail-merchant">${esc(tx.merchant)}</div>
+        <div class="tx-detail-date">${dateStr}</div>
+
+        <div class="info-card">
+          <div class="status-block">
+            <div class="status-main">Status: Approved</div>
+            <div class="status-card-name">${esc(card.name)}</div>
+          </div>
+          <div class="info-divider"></div>
+          <div class="info-row">
+            <span class="info-label">Total</span>
+            <span class="info-value">${formatMoney(Math.abs(tx.amount), currency)}</span>
+          </div>
+        </div>
+
+        <button type="button" class="action-btn" id="contact-btn">Contact ${esc(card.name || 'Issuer')}</button>
+
+        <div class="help-text">For help with a charge you don't recognize or to dispute a charge, contact ${esc(card.name || 'the issuer')}.</div>
+
+        <button type="button" class="action-btn" id="report-btn">Report Incorrect Merchant Info</button>
+
+        <div class="help-text">Wallet uses Maps to provide merchant name, category and location for your transactions. Help improve accuracy by reporting incorrect information.</div>
+
+      `;
+
+      const contactBtn = document.getElementById('contact-btn');
+      if (contactBtn) contactBtn.onclick = () => { contactBtn.textContent = 'Issuer contact information unavailable'; contactBtn.disabled = true; };
+      const reportBtn = document.getElementById('report-btn');
+      if (reportBtn) reportBtn.onclick = () => { reportBtn.textContent = 'Report submitted'; reportBtn.disabled = true; };
+    }
+
+    // ========== + MENU ==========
+    function openPlusSheet() {
+      document.getElementById('plus-sheet').classList.add('open');
+    }
+    function closePlusSheet() {
+      document.getElementById('plus-sheet').classList.remove('open');
+    }
+
+    // ========== EDITORS ==========
+    function openCardEditor(cardId = null) {
+      closePlusSheet();
+      const isNew = !cardId;
+      const existing = cardId ? cards.find(c => c.id === cardId) : null;
+      const card = isNew ? {
+        id: uid(), name: '', lastFour: '', network: 'Card', currency: 'GBP',
+        bg: 'bg-blue', customImage: null, balance: 0, transactions: []
+      } : Object.assign({}, existing);
+
+      const panel = document.getElementById('editor-panel');
+      let colorHtml = BG_COLORS.map(c =>
+        `<div class="color-swatch ${c}${card.bg === c && !card.customImage ? ' selected' : ''}" data-bg="${c}"></div>`
+      ).join('');
+      let curHtml = Object.keys(CURRENCIES).map(c =>
+        `<option value="${c}"${card.currency === c ? ' selected' : ''}>${c} (${CURRENCIES[c].symbol})</option>`
+      ).join('');
+
+      panel.innerHTML = `
+        <div class="editor-header">
+          <h2>${isNew ? 'Add Card' : 'Edit Card'}</h2>
+          <button type="button" class="close-btn" id="close-editor">×</button>
+        </div>
+        <div class="form-group">
+          <label>Card Name</label>
+          <input type="text" id="edit-name" value="${esc(card.name)}" placeholder="e.g. American Express" />
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Last 4 Digits</label>
+            <input type="text" id="edit-lastfour" value="${esc(card.lastFour)}" maxlength="4" placeholder="7465" inputmode="numeric" />
+          </div>
+          <div class="form-group">
+            <label>Network / Type</label>
+            <input type="text" id="edit-network" value="${esc(card.network)}" placeholder="Visa, Amex, Virtual..." />
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Currency</label>
+          <select id="edit-currency">${curHtml}</select>
+        </div>
+        <div class="form-group">
+          <label>Available Balance (optional)</label>
+          <input type="number" id="edit-balance" value="${card.balance || 0}" step="0.01" />
+        </div>
+        <div class="form-group">
+          <label>Background Color</label>
+          <div class="color-row">${colorHtml}</div>
+        </div>
+        <div class="form-group">
+          <label>Custom Card Image</label>
+          <div class="upload-area" id="upload-area">
+            Tap to upload image
+            <input type="file" id="image-upload" accept="image/*" />
+            ${card.customImage ? `<img class="preview-img" src="${card.customImage}" />` : ''}
+          </div>
+          ${card.customImage ? `<button type="button" class="btn btn-secondary" id="remove-image" style="width:100%;margin-top:8px;">Remove Image</button>` : ''}
+        </div>
+        <div class="btn-row">
+          ${!isNew ? `<button type="button" class="btn btn-danger" id="delete-card">Delete</button>` : ''}
+          <button type="button" class="btn btn-primary" id="save-card">${isNew ? 'Add Card' : 'Save'}</button>
+        </div>
+      `;
+
+      document.getElementById('editor-overlay').classList.add('open');
+      document.getElementById('close-editor').onclick = closeEditor;
+
+      document.querySelectorAll('.color-swatch').forEach(sw => {
+        sw.onclick = () => {
+          document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
+          sw.classList.add('selected');
+          card.bg = sw.dataset.bg;
+          card.customImage = null;
+          const prev = document.querySelector('.preview-img');
+          if (prev) prev.remove();
+        };
+      });
+
+      const uploadArea = document.getElementById('upload-area');
+      const fileInput = document.getElementById('image-upload');
+      uploadArea.onclick = (e) => { if (e.target.tagName !== 'IMG') fileInput.click(); };
+      fileInput.onchange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        compressImage(file).then(dataUrl => {
+          card.customImage = dataUrl;
+          let img = uploadArea.querySelector('.preview-img');
+          if (!img) { img = document.createElement('img'); img.className = 'preview-img'; uploadArea.appendChild(img); }
+          img.src = card.customImage;
+          document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
+        }).catch(() => showSaveError('That image could not be loaded. Please try another image.'));
+      };
+      const removeBtn = document.getElementById('remove-image');
+      if (removeBtn) {
+        removeBtn.onclick = () => {
+          card.customImage = null;
+          const img = document.querySelector('.preview-img');
+          if (img) img.remove();
+        };
+      }
+
+      document.getElementById('save-card').onclick = () => {
+        card.name = document.getElementById('edit-name').value.trim();
+        card.lastFour = document.getElementById('edit-lastfour').value.trim().replace(/\D/g,'').slice(0,4);
+        card.network = document.getElementById('edit-network').value.trim();
+        card.currency = document.getElementById('edit-currency').value;
+        card.balance = parseFloat(document.getElementById('edit-balance').value) || 0;
+
+        if (isNew) {
+          cards.unshift(card); // add to front
+        } else {
+          const idx = cards.findIndex(c => c.id === cardId);
+          if (idx !== -1) {
+            card.transactions = cards[idx].transactions;
+            cards[idx] = card;
+          }
+        }
+        if (!saveData()) return;
+        closeEditor();
+        renderCardStack();
+        if (currentCardId === card.id) openCardDetail(card.id);
+      };
+
+      const delBtn = document.getElementById('delete-card');
+      if (delBtn) {
+        delBtn.onclick = () => {
+          if (confirm('Delete this card and all its transactions?')) {
+            cards = cards.filter(c => c.id !== cardId);
+            if (!saveData()) return;
+            closeEditor();
+            currentCardId = null;
+            document.getElementById('detail-view').classList.remove('active');
+            document.getElementById('wallet-view').classList.add('active');
+            renderCardStack();
+          }
+        };
+      }
+    }
+
+    function openManageCards() {
+      closePlusSheet();
+      if (cards.length === 0) {
+        openCardEditor();
+        return;
+      }
+      // Simple list to pick which card to edit
+      const panel = document.getElementById('editor-panel');
+      panel.innerHTML = `
+        <div class="editor-header">
+          <h2>Manage Cards</h2>
+          <button type="button" class="close-btn" id="close-editor">×</button>
+        </div>
+        <div style="margin-bottom:12px;color:var(--muted);font-size:14px;">Tap a card to edit it</div>
+        ${cards.map(c => `
+          <div class="sheet-item" data-cid="${c.id}" style="background:var(--surface-2);margin-bottom:8px;border-radius:12px;">
+            <span class="icon">💳</span> ${esc(c.name)} ${c.lastFour ? '••••' + c.lastFour : ''}
+          </div>
+        `).join('')}
+        <button type="button" class="btn btn-primary" id="add-new-from-manage" style="width:100%;margin-top:12px;">+ Add New Card</button>
+      `;
+      document.getElementById('editor-overlay').classList.add('open');
+      document.getElementById('close-editor').onclick = closeEditor;
+      panel.querySelectorAll('[data-cid]').forEach(el => {
+        el.onclick = () => openCardEditor(el.dataset.cid);
+      });
+      document.getElementById('add-new-from-manage').onclick = () => openCardEditor();
+    }
+
+    function openAddTransactionPicker() {
+      closePlusSheet();
+      if (cards.length === 0) { alert('Add a card first'); return; }
+      const panel = document.getElementById('editor-panel');
+      panel.innerHTML = `
+        <div class="editor-header"><h2>Add Transaction</h2><button type="button" class="close-btn" id="close-editor">×</button></div>
+        <div style="margin-bottom:12px;color:var(--muted);font-size:14px;">${cards.length === 1 ? 'Choose an action' : 'Choose a card or generate transactions'}</div>
+        ${cards.map(c => `<div class="sheet-item" data-cid="${c.id}" style="background:var(--surface-2);margin-bottom:8px;border-radius:12px;"><span class="icon">💳</span> Add to ${esc(c.name)}</div>`).join('')}
+        <div class="sheet-item" id="generate-random-tx" style="background:var(--surface-2);margin-top:10px;border-radius:12px;"><span class="icon">🎲</span> Generate 10 Random Transactions</div>
+        <div style="margin:8px 4px 0;color:var(--muted);font-size:12px;line-height:1.4;">Random transactions use dates before today and automatically update the available balance.</div>`;
+      document.getElementById('editor-overlay').classList.add('open');
+      document.getElementById('close-editor').onclick = closeEditor;
+      panel.querySelectorAll('[data-cid]').forEach(el => el.onclick = () => openTransactionEditor(el.dataset.cid));
+      document.getElementById('generate-random-tx').onclick = () => cards.length === 1 ? generateRandomTransactions(cards[0].id) : openRandomTransactionPicker();
+    }
+
+    function openRandomTransactionPicker() {
+      const panel = document.getElementById('editor-panel');
+      panel.innerHTML = `<div class="editor-header"><h2>Generate Transactions</h2><button type="button" class="close-btn" id="close-editor">×</button></div><div style="margin-bottom:12px;color:var(--muted);font-size:14px;">Choose which card should receive 10 random transactions.</div>${cards.map(c => `<div class="sheet-item" data-random-cid="${c.id}" style="background:var(--surface-2);margin-bottom:8px;border-radius:12px;"><span class="icon">🎲</span> ${esc(c.name)}</div>`).join('')}`;
+      document.getElementById('close-editor').onclick = closeEditor;
+      panel.querySelectorAll('[data-random-cid]').forEach(el => el.onclick = () => generateRandomTransactions(el.dataset.randomCid));
+    }
+
+    function generateRandomTransactions(cardId) {
+      const card = cards.find(c => c.id === cardId); if (!card) return;
+      const merchants = [
+        ['Tesco','Groceries',8,75,-1],['Sainsbury’s','Groceries',7,65,-1],['Esso','Fuel',15,70,-1],['Uber','Transport',8,42,-1],
+        ['Amazon','Shopping',12,120,-1],['Apple','Purchase',2,45,-1],['Pret A Manger','Food & Drink',4,18,-1],['McDonald’s','Food & Drink',5,16,-1],
+        ['Waitrose','Groceries',10,90,-1],['Shell','Fuel',20,75,-1],['Netflix','Subscription',6,18,-1],['Spotify','Subscription',6,13,-1],
+        ['Salary','Income',100,900,1],['Transfer','Transfer',25,350,1],['Refund','Refund',5,80,1] ];
+      const today = new Date(); today.setHours(0,0,0,0);
+      const r = (a,b) => Math.floor(Math.random()*(b-a+1))+a;
+      const pad = n => String(n).padStart(2,'0');
+      for (let i=0;i<10;i++) {
+        const m=merchants[r(0,merchants.length-1)], d=new Date(today); d.setDate(d.getDate()-r(1,60)); d.setHours(r(6,23),r(0,59),0,0);
+        const amount=r(m[2]*100,m[3]*100)/100*m[4];
+        const tx={id:uid(),merchant:m[0],amount,datetime:`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`,note:m[1],category:m[1]};
+        card.transactions.push(tx); card.balance=(Number(card.balance)||0)+amount;
+      }
+      if (!saveData()) return;
+      closeEditor();
+      openCardDetail(card.id);
+      showSaveToast(`Added 10 random transactions to ${card.name}.`);
+    }
+
+
+    function openTransactionEditor(cardId, txId = null) {
+      const card = cards.find(c => c.id === cardId);
+      if (!card) return;
+      const isNew = !txId;
+      const existing = txId ? card.transactions.find(t => t.id === txId) : null;
+      const tx = isNew ? {
+        id: uid(),
+        merchant: '',
+        amount: 0,
+        datetime: new Date().toISOString().slice(0, 16), // YYYY-MM-DDTHH:mm
+        note: '',
+        category: 'other'
+      } : Object.assign({}, existing);
+
+      // Ensure datetime format for input
+      if (tx.datetime && tx.datetime.length === 10) tx.datetime += 'T12:00';
+
+      const panel = document.getElementById('editor-panel');
+      panel.innerHTML = `
+        <div class="editor-header">
+          <h2>${isNew ? 'Add Transaction' : 'Edit Transaction'}</h2>
+          <button type="button" class="close-btn" id="close-editor">×</button>
+        </div>
+        <div class="form-group">
+          <label>Store / Vendor</label>
+          <input type="text" id="edit-merchant" value="${esc(tx.merchant)}" placeholder="e.g. Uber, Esso, Apple Store" />
+        </div>
+        <div class="form-group">
+          <label>Amount (negative = spending, positive = income)</label>
+          <input type="number" id="edit-amount" value="${tx.amount}" step="0.01" placeholder="-24.50" />
+        </div>
+        <div class="form-group">
+          <label>Date & Time</label>
+          <input type="datetime-local" id="edit-datetime" value="${tx.datetime}" />
+        </div>
+        <div class="form-group">
+          <label>Category (optional)</label>
+          <input type="text" id="edit-note" value="${esc(tx.category || tx.note || '')}" placeholder="e.g. Groceries, Fuel, Entertainment" />
+        </div>
+        <div class="btn-row">
+          ${!isNew ? `<button type="button" class="btn btn-danger" id="delete-tx">Delete</button>` : ''}
+          <button type="button" class="btn btn-primary" id="save-tx">${isNew ? 'Add' : 'Save'}</button>
+        </div>
+      `;
+
+      document.getElementById('editor-overlay').classList.add('open');
+      document.getElementById('close-editor').onclick = closeEditor;
+
+      document.getElementById('save-tx').onclick = () => {
+        tx.merchant = document.getElementById('edit-merchant').value.trim() || 'Transaction';
+        tx.amount = parseFloat(document.getElementById('edit-amount').value) || 0;
+        tx.datetime = document.getElementById('edit-datetime').value || new Date().toISOString().slice(0,16);
+        tx.category = document.getElementById('edit-note').value.trim() || (tx.amount > 0 ? 'income' : 'other');
+        tx.note = tx.note || '';
+
+        if (isNew) {
+          card.transactions.unshift(tx);
+          card.balance = (Number(card.balance) || 0) + tx.amount;
+        } else {
+          const idx = card.transactions.findIndex(t => t.id === txId);
+          if (idx !== -1) {
+            const oldAmount = Number(card.transactions[idx].amount) || 0;
+            card.transactions[idx] = tx;
+            card.balance = (Number(card.balance) || 0) - oldAmount + tx.amount;
+          }
+        }
+        if (!saveData()) return;
+        closeEditor();
+
+        // Refresh the right view
+        if (document.getElementById('tx-detail-view').classList.contains('active')) {
+          openTxDetail(cardId, tx.id);
+        } else {
+          openCardDetail(cardId);
+        }
+      };
+
+      const delBtn = document.getElementById('delete-tx');
+      if (delBtn) {
+        delBtn.onclick = () => {
+          const deletedTx = card.transactions.find(t => t.id === txId);
+          if (deletedTx) card.balance = (Number(card.balance) || 0) - (Number(deletedTx.amount) || 0);
+          card.transactions = card.transactions.filter(t => t.id !== txId);
+          if (!saveData()) return;
+          closeEditor();
+          document.getElementById('tx-detail-view').classList.remove('active');
+          openCardDetail(cardId);
+        };
+      }
+    }
+
+    function closeEditor() {
+      document.getElementById('editor-overlay').classList.remove('open');
+    }
+
+    
+    // ========== DRAG TO REORDER ==========
+    function setupCardDrag(el) {
+      let startY = 0;
+      let originY = 0;
+      let startIndex = 0;
+      let currentIndex = 0;
+      let isDragging = false;
+      let pointerId = null;
+
+      function idxOf(node) {
+        return Array.from(node.parentNode.children).indexOf(node);
+      }
+
+      function begin(clientY) {
+        startY = clientY;
+        originY = clientY;
+        startIndex = idxOf(el);
+        currentIndex = startIndex;
+        isDragging = false;
+        dragState = { moved: false, el: el };
+      }
+
+      function move(clientY) {
+        if (!dragState || dragState.el !== el) return;
+        const total = Math.abs(clientY - originY);
+
+        // Only start real drag after 12px movement
+        if (total > 12 && !isDragging) {
+          isDragging = true;
+          dragState.moved = true;
+          el.classList.add('dragging');
+          el.style.zIndex = '300';
+          el.style.transition = 'none';
+        }
+        if (!isDragging) return;
+
+        const dy = clientY - startY;
+        el.style.transform = 'translateY(' + dy + 'px) scale(1.03)';
+
+        const stack = document.getElementById('card-stack');
+        const mid = el.getBoundingClientRect().top + el.getBoundingClientRect().height * 0.5;
+        const others = Array.from(stack.querySelectorAll('.wallet-card:not(.dragging)'));
+
+        let target = currentIndex;
+        others.forEach(function(other) {
+          const oMid = other.getBoundingClientRect().top + other.getBoundingClientRect().height * 0.5;
+          const oIdx = idxOf(other);
+          if (mid < oMid && oIdx < currentIndex) target = Math.min(target, oIdx);
+          if (mid > oMid && oIdx > currentIndex) target = Math.max(target, oIdx);
+        });
+
+        if (target !== currentIndex) {
+          // Update data
+          const item = cards.splice(currentIndex, 1)[0];
+          cards.splice(target, 0, item);
+
+          // Update DOM without full re-render (smooth)
+          const children = Array.from(stack.children);
+          if (target >= children.length - 1) {
+            stack.appendChild(el);
+          } else {
+            const ref = stack.children[target];
+            if (ref && ref !== el) stack.insertBefore(el, ref);
+          }
+          currentIndex = target;
+          // Keep finger under the card
+          startY = clientY;
+          el.style.transform = 'scale(1.03)';
+        }
+      }
+
+      function end() {
+        if (!dragState || dragState.el !== el) return;
+        el.classList.remove('dragging');
+        el.style.transform = '';
+        el.style.zIndex = '';
+        el.style.transition = '';
+
+        if (isDragging) {
+          saveData();
+          // Full re-render to clean up any transform leftovers
+          renderCardStack();
+        }
+        setTimeout(function() { dragState = null; }, 100);
+      }
+
+      // ----- Touch -----
+      el.addEventListener('touchstart', function(e) {
+        if (e.touches.length !== 1) return;
+        begin(e.touches[0].clientY);
+      }, { passive: true });
+
+      el.addEventListener('touchmove', function(e) {
+        if (!dragState || dragState.el !== el) return;
+        if (isDragging) e.preventDefault();
+        move(e.touches[0].clientY);
+      }, { passive: false });
+
+      el.addEventListener('touchend', end);
+      el.addEventListener('touchcancel', end);
+
+      // ----- Mouse -----
+      el.addEventListener('mousedown', function(e) {
+        if (e.button !== 0) return;
+        begin(e.clientY);
+        function onMove(ev) {
+          if (isDragging) ev.preventDefault();
+          move(ev.clientY);
+        }
+        function onUp() {
+          end();
+          window.removeEventListener('mousemove', onMove);
+          window.removeEventListener('mouseup', onUp);
+        }
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('mouseup', onUp);
+      });
+    }
+
+    // ========== HELPERS ==========
+    function compressImage(file, maxWidth = 1200, maxHeight = 760, quality = 0.78) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = reject;
+        reader.onload = () => {
+          const img = new Image();
+          img.onerror = reject;
+          img.onload = () => {
+            const scale = Math.min(1, maxWidth / img.width, maxHeight / img.height);
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.max(1, Math.round(img.width * scale));
+            canvas.height = Math.max(1, Math.round(img.height * scale));
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            resolve(canvas.toDataURL('image/jpeg', quality));
+          };
+          img.src = reader.result;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+    function esc(str) {
+      if (!str) return '';
+      return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+    function formatMoney(amount, currency) {
+      const abs = Math.abs(amount);
+      return new Intl.NumberFormat(currency.locale, {
+        style: 'currency',
+        currency: currency.code,
+        minimumFractionDigits: currency.code === 'JPY' ? 0 : 2
+      }).format(abs);
+    }
+    function relativeTime(datetime) {
+      if (!datetime) return '';
+      const d = new Date(datetime);
+      const now = new Date();
+      const diffMs = now - d;
+      const mins = Math.floor(diffMs / 60000);
+      if (mins < 1) return 'Just now';
+      if (mins < 60) return mins + ' minutes ago';
+      const hours = Math.floor(mins / 60);
+      if (hours < 24) return hours + ' hour' + (hours > 1 ? 's' : '') + ' ago';
+      const days = Math.floor(hours / 24);
+      if (days < 7) return days + ' day' + (days > 1 ? 's' : '') + ' ago';
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    }
+
+    // ========== EVENTS ==========
+    document.getElementById('fab-search').onclick = () => openSearch(document.getElementById('detail-view').classList.contains('active') ? 'detail-view' : 'wallet-view', true);
+    document.getElementById('wallet-search-close').onclick = closeSearch;
+    document.getElementById('wallet-search-clear').onclick = () => { document.getElementById('wallet-search-input').value=''; searchQuery=''; searchFilter=null; renderSearchHome(); document.getElementById('wallet-search-input').focus(); };
+    document.getElementById('wallet-search-input').addEventListener('input', e => { searchQuery=e.target.value; searchFilter=null; document.getElementById('wallet-search-clear').style.display=searchQuery?'flex':'none'; renderSearchResults(); });
+    document.getElementById('search-see-all').onclick = () => { searchFilter='__all__'; searchQuery=''; document.getElementById('wallet-search-input').value=''; renderSearchResults(); };
+    document.getElementById('more-btn').onclick = openManageCards;
+
+    document.getElementById('plus-btn').onclick = openPlusSheet;
+    document.getElementById('sheet-cancel').onclick = closePlusSheet;
+    document.getElementById('plus-sheet').addEventListener('click', (e) => {
+      if (e.target.id === 'plus-sheet') closePlusSheet();
+    });
+    document.getElementById('action-add-card').onclick = () => openCardEditor();
+    document.getElementById('action-edit-cards').onclick = openManageCards;
+    document.getElementById('action-add-tx').onclick = openAddTransactionPicker;
+    document.getElementById('weekly-activity-btn').onclick = openActivityView;
+    document.getElementById('activity-back-btn').onclick = () => { document.getElementById('activity-view').classList.remove('active'); if (activityReturnView === 'detail-view') openCardDetail(currentCardId); else { document.getElementById('wallet-view').classList.add('active'); renderCardStack(); } };
+    document.querySelectorAll('.period-btn').forEach(btn => btn.addEventListener('click', () => { activityPeriod = btn.dataset.period; renderActivity(); }));
+
+    document.getElementById('back-btn').onclick = () => {
+      document.getElementById('detail-view').classList.remove('active');
+      document.getElementById('activity-view').classList.remove('active');
+      document.getElementById('wallet-view').classList.add('active');
+      document.getElementById('fab-search').style.display = 'none';
+      currentCardId = null;
+      renderCardStack();
+    };
+    document.getElementById('tx-back-btn').onclick = () => {
+      document.getElementById('tx-detail-view').classList.remove('active');
+      if (currentCardId) openCardDetail(currentCardId);
+    };
+
+    document.getElementById('editor-overlay').addEventListener('click', (e) => {
+      if (e.target.id === 'editor-overlay') closeEditor();
+    });
+
+    // ========== INIT ==========
+    loadData();
+    renderCardStack();
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    }
+  </script>
+</body>
+</html>
